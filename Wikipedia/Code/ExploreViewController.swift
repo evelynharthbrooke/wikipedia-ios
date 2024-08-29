@@ -619,7 +619,7 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
         cell.title = group.headerTitle
         cell.subtitle = group.headerSubTitle
         cell.footerTitle = cardVC.footerText
-        cell.customizationButton.menu = createMenu(cell: cell, group: group)
+        cell.customizationButton.menu = createMenu(cell, group)
         cell.customizationButton.showsMenuAsPrimaryAction = true
         cell.isCustomizationButtonHidden = !(group.contentGroupKind.isCustomizable || group.contentGroupKind.isGlobal)
         cell.undoType = group.undoType
@@ -631,7 +631,7 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
     }
     
     // MARK: Context Menu handling
-    func createMenu(cell: ExploreCardCollectionViewCell, group: WMFContentGroup) -> UIMenu? {
+    func createMenu(_ cell: ExploreCardCollectionViewCell, _ group: WMFContentGroup) -> UIMenu? {
         guard group.contentGroupKind.isCustomizable || group.contentGroupKind.isGlobal else {
             return nil
         }
