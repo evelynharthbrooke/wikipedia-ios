@@ -619,6 +619,8 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
         cell.title = group.headerTitle
         cell.subtitle = group.headerSubTitle
         cell.footerTitle = cardVC.footerText
+        cell.customizationButton.menu = createMenu(cell: cell, group: group)
+        cell.customizationButton.showsMenuAsPrimaryAction = true
         cell.isCustomizationButtonHidden = !(group.contentGroupKind.isCustomizable || group.contentGroupKind.isGlobal)
         cell.undoType = group.undoType
         cell.apply(theme: theme)
@@ -626,6 +628,51 @@ class ExploreViewController: ColumnarCollectionViewController, ExploreCardViewCo
         if group.undoType == .contentGroupKind {
             indexPathsForCollapsedCellsThatCanReappear.insert(indexPath)
         }
+    }
+    
+    // MARK: Context Menu handling
+    func createMenu(cell: ExploreCardCollectionViewCell, group: WMFContentGroup) -> UIMenu? {
+        guard group.contentGroupKind.isCustomizable || group.contentGroupKind.isGlobal else {
+            return nil
+        }
+        let hideThisCardHidesAll = group.contentGroupKind.isGlobal && group.contentGroupKind.isNonDateBased
+        let hideThisCardHandler: ((UIAction) -> Void) = { (_) in
+            group.undoType = .contentGroup
+            self.wantsDeleteInsertOnNextItemUpdate = true
+            self.save()
+        }
+        
+        let hideAllHandler: ((UIAction) -> Void) = { (_) in
+            let feedContentController = self.dataStore.feedContentController
+            // If there's only one group left it means that we're about to show an alert about turning off
+            // the Explore tab. In those cases, we don't want to provide the option to undo.
+            if feedContentController.countOfVisibleContentGroupKinds > 1 {
+                group.undoType = .contentGroupKind
+                self.wantsDeleteInsertOnNextItemUpdate = true
+            }
+            feedContentController.toggleContentGroup(of: group.contentGroupKind, isOn: false, waitForCallbackFromCoordinator: true, apply: true, updateFeed: false)
+        }
+        
+        let hideThisCard = UIAction(title: WMFLocalizedString("explore-feed-preferences-hide-card-action-title", value: "Hide this card", comment: "Title for action that allows users to hide a feed card"), image: UIImage(systemName: "eye.slash"), handler: hideThisCardHidesAll ? hideAllHandler : hideThisCardHandler)
+        let hideAllCards = UIAction(title: WMFLocalizedString("explore-feed-preferences-hide-feed-cards-action-title", value: "Hide all of this card", comment: "Title for action that allows users to hide all feed cards of given type"), image: UIImage(systemName: "eye.slash.fill"), handler: hideAllHandler)
+        let customizeExploreFeed = UIAction(title: CommonStrings.customizeExploreFeedTitle, image: UIImage(systemName: "eyedropper")) { (_) in
+            let exploreFeedSettingsViewController = ExploreFeedSettingsViewController()
+            exploreFeedSettingsViewController.showCloseButton = true
+            exploreFeedSettingsViewController.dataStore = self.dataStore
+            exploreFeedSettingsViewController.apply(theme: self.theme)
+            let themeableNavigationController = WMFThemeableNavigationController(rootViewController: exploreFeedSettingsViewController, theme: self.theme)
+            themeableNavigationController.modalPresentationStyle = .formSheet
+            self.present(themeableNavigationController, animated: true)
+        }
+        
+        var actions: [UIMenuElement] = []
+        actions.append(hideThisCard)
+        if group.contentGroupKind != WMFContentGroupKind.notification && (!hideThisCardHidesAll) {
+            actions.append(hideAllCards)
+        }
+        actions.append(customizeExploreFeed)
+        
+        return UIMenu(children: actions)
     }
     
     override func apply(theme: Theme) {
@@ -1051,19 +1098,6 @@ extension ExploreViewController: ReadingListsAlertControllerDelegate {
 }
 
 extension ExploreViewController: ExploreCardCollectionViewCellDelegate {
-    func exploreCardCollectionViewCellWantsCustomization(_ cell: ExploreCardCollectionViewCell) {
-        guard let vc = cell.cardContent as? ExploreCardViewController,
-            let group = vc.contentGroup else {
-            return
-        }
-        guard let sheet = menuActionSheetForGroup(group) else {
-            return
-        }
-        sheet.popoverPresentationController?.sourceView = cell.customizationButton
-        sheet.popoverPresentationController?.sourceRect = cell.customizationButton.bounds
-        present(sheet, animated: true)
-    }
-
     private func save() {
         do {
             try self.dataStore.save()
@@ -1133,59 +1167,6 @@ extension ExploreViewController: ExploreCardCollectionViewCellDelegate {
     
     @objc func viewContextDidReset(_ note: Notification) {
         collectionView.reloadData()
-    }
-
-    private func menuActionSheetForGroup(_ group: WMFContentGroup) -> UIAlertController? {
-        guard group.contentGroupKind.isCustomizable || group.contentGroupKind.isGlobal else {
-            return nil
-        }
-        let hideThisCardHidesAll = group.contentGroupKind.isGlobal && group.contentGroupKind.isNonDateBased
-        
-        let sheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-        let customizeExploreFeed = UIAlertAction(title: CommonStrings.customizeExploreFeedTitle, style: .default) { (_) in
-            let exploreFeedSettingsViewController = ExploreFeedSettingsViewController()
-            exploreFeedSettingsViewController.showCloseButton = true
-            exploreFeedSettingsViewController.dataStore = self.dataStore
-            exploreFeedSettingsViewController.apply(theme: self.theme)
-            let themeableNavigationController = WMFThemeableNavigationController(rootViewController: exploreFeedSettingsViewController, theme: self.theme)
-            themeableNavigationController.modalPresentationStyle = .formSheet
-            self.present(themeableNavigationController, animated: true)
-        }
-        
-        let hideThisCardHandler: ((UIAlertAction) -> Void) = { (_) in
-            group.undoType = .contentGroup
-            self.wantsDeleteInsertOnNextItemUpdate = true
-            self.save()
-        }
-        
-        let hideAllHandler: ((UIAlertAction) -> Void) = { (_) in
-            let feedContentController = self.dataStore.feedContentController
-            // If there's only one group left it means that we're about to show an alert about turning off the Explore tab. In those cases, we don't want to provide the option to undo.
-            if feedContentController.countOfVisibleContentGroupKinds > 1 {
-                group.undoType = .contentGroupKind
-                self.wantsDeleteInsertOnNextItemUpdate = true
-            }
-            feedContentController.toggleContentGroup(of: group.contentGroupKind, isOn: false, waitForCallbackFromCoordinator: true, apply: true, updateFeed: false)
-        }
-        
-        let hideThisCard = UIAlertAction(title: WMFLocalizedString("explore-feed-preferences-hide-card-action-title", value: "Hide this card", comment: "Title for action that allows users to hide a feed card"), style: .default, handler: hideThisCardHidesAll ? hideAllHandler : hideThisCardHandler)
-        
-        guard let title = group.headerTitle else {
-            assertionFailure("Expected header title for group \(group.contentGroupKind)")
-            return nil
-        }
-        
-        let hideAllCards = UIAlertAction(title: String.localizedStringWithFormat(WMFLocalizedString("explore-feed-preferences-hide-feed-cards-action-title", value: "Hide all “%@” cards", comment: "Title for action that allows users to hide all feed cards of given type - %@ is replaced with feed card type"), title), style: .default, handler: hideAllHandler)
-        
-        let cancel = UIAlertAction(title: CommonStrings.cancelActionTitle, style: .cancel)
-        sheet.addAction(hideThisCard)
-        if group.contentGroupKind != WMFContentGroupKind.notification && (!hideThisCardHidesAll) {
-            sheet.addAction(hideAllCards)
-        }
-        sheet.addAction(customizeExploreFeed)
-        sheet.addAction(cancel)
-
-        return sheet
     }
 
     func exploreCardCollectionViewCellWantsToUndoCustomization(_ cell: ExploreCardCollectionViewCell) {

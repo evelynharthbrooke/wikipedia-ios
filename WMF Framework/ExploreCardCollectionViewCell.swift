@@ -24,7 +24,6 @@ private class CardBackgroundView: UIView {
 }
 
 public protocol ExploreCardCollectionViewCellDelegate: AnyObject {
-    func exploreCardCollectionViewCellWantsCustomization(_ cell: ExploreCardCollectionViewCell)
     func exploreCardCollectionViewCellWantsToUndoCustomization(_ cell: ExploreCardCollectionViewCell)
 }
     
@@ -56,7 +55,6 @@ public class ExploreCardCollectionViewCell: CollectionViewCell, CardBackgroundVi
         deprecatedCustomizationButton.deprecatedImageEdgeInsets = .zero
         deprecatedCustomizationButton.deprecatedTitleEdgeInsets = .zero
         customizationButton.titleLabel?.textAlignment = .center
-        customizationButton.addTarget(self, action: #selector(customizationButtonPressed), for: .touchUpInside)
         cardBackgroundView.layer.cornerRadius = cardCornerRadius
         cardBackgroundView.layer.shadowOffset = cardShadowOffset
         cardBackgroundView.layer.shadowRadius = cardShadowRadius
@@ -169,7 +167,7 @@ public class ExploreCardCollectionViewCell: CollectionViewCell, CardBackgroundVi
                 guard let title = title else {
                     return
                 }
-                undoTitle = String.localizedStringWithFormat(WMFLocalizedString("explore-feed-preferences-feed-cards-hidden-title", value: "All %@ cards hidden", comment: "Title for cell that appears in place of feed card hidden by user via the overflow button - %@ is replaced with feed card type"), title)
+                undoTitle = String.localizedStringWithFormat(WMFLocalizedString("explore-feed-preferences-feed-cards-hidden-title", value: "All \"%@\" cards hidden", comment: "Title for cell that appears in place of feed card hidden by user via the overflow button - %@ is replaced with feed card type"), title)
                 isCollapsed = true
             default:
                isCollapsed = false
@@ -354,10 +352,6 @@ public class ExploreCardCollectionViewCell: CollectionViewCell, CardBackgroundVi
         let displayScale = max(1, traitCollection.displayScale)
         cardBorderWidth = CGFloat(theme.cardBorderWidthInPixels) / displayScale
     }
-    
-    @objc func customizationButtonPressed() {
-        delegate?.exploreCardCollectionViewCellWantsCustomization(self)
-    }
 
     @objc func undoButtonPressed() {
         delegate?.exploreCardCollectionViewCellWantsToUndoCustomization(self)
@@ -373,9 +367,6 @@ public class ExploreCardCollectionViewCell: CollectionViewCell, CardBackgroundVi
             updatedAccessibilityElements.append(undoButton)
         } else {
             let groupedLabels = [titleLabel, subtitleLabel]
-            let customizeActionTitle = WMFLocalizedString("explore-feed-customize-accessibility-title", value: "Customize", comment: "Accessibility title for feed customization")
-            let customizeAction = UIAccessibilityCustomAction(name: customizeActionTitle, target: self, selector: #selector(customizationButtonPressed))
-            updatedAccessibilityElements.append(LabelGroupAccessibilityElement(view: self, labels: groupedLabels, actions: [customizeAction]))
             if let contentView = cardContent?.view {
                 updatedAccessibilityElements.append(contentView)
             }
